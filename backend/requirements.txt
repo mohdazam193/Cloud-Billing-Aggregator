@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+boto3
+azure-identity
+azure-mgmt-costmanagement
+starlette

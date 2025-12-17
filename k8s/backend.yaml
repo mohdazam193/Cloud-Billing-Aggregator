@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: billing-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: billing-backend
+  template:
+    metadata:
+      labels:
+        app: billing-backend
+    spec:
+      containers:
+      - name: backend
+        image: billing-backend:latest
+        ports:
+        - containerPort: 8000
