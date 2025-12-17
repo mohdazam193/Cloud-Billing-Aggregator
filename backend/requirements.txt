@@ -4,3 +4,4 @@ boto3
 azure-identity
 azure-mgmt-costmanagement
 starlette
+itsdangerous
