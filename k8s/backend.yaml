@@ -14,6 +14,6 @@ spec:
     spec:
       containers:
       - name: backend
-        image: billing-backend-aggrregator:latest
+        image: billing-backend:latest
         ports:
         - containerPort: 8000
