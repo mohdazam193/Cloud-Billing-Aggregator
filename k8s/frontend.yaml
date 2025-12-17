@@ -2,6 +2,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: billing-frontend
+  labels:
+    app: billing-frontend
 spec:
   replicas: 1
   selector:
@@ -13,7 +15,8 @@ spec:
         app: billing-frontend
     spec:
       containers:
-      - name: frontend
-        image: billing-frontend:latest
-        ports:
-        - containerPort: 80
+        - name: frontend
+          image: billing-frontend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
