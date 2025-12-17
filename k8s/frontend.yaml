@@ -14,6 +14,6 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: billing-frontend:latest
+        image: aazammohammad193/billing-frontend:latest
         ports:
         - containerPort: 80
