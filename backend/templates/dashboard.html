@@ -1,10 +1,18 @@
-<html>
-<head><link rel="stylesheet" href="/static/style.css"></head>
-<body>
-<h2>Dashboard</h2>
-<p>AWS Cost: {{ aws }}</p>
-<p>Azure Cost: {{ azure }}</p>
-<p>Total Cost: {{ total }}</p>
+<html><head><link rel="stylesheet" href="/static/style.css"></head>
+<body><div class="container">
+<h1>Cost Dashboard</h1>
+<form method="get">
+<select name="days" onchange="this.form.submit()">
+<option value="30" {% if days==30 %}selected{% endif %}>30d</option>
+<option value="60" {% if days==60 %}selected{% endif %}>60d</option>
+<option value="90" {% if days==90 %}selected{% endif %}>90d</option>
+</select></form>
+<div class="stats">
+<div class="stat-card"><h3>Total</h3><p>${{ total }}</p></div>
+{% if aws_services %}<div class="stat-card"><h3>AWS</h3><p>${{ aws_total }}</p></div>{% endif %}
+{% if azure_services %}<div class="stat-card"><h3>Azure</h3><p>${{ azure_total }}</p></div>{% endif %}
+</div>
+{% if aws_services %}<h2>AWS Services</h2><table>{% for s in aws_services %}<tr><td>{{ s.service }}</td><td>${{ s.cost }}</td></tr>{% endfor %}</table>{% endif %}
+{% if azure_services %}<h2>Azure Services</h2><table>{% for s in azure_services %}<tr><td>{{ s.service }}</td><td>${{ s.cost }}</td></tr>{% endfor %}</table>{% endif %}
 <a href="/logout">Logout</a>
-</body>
-</html>
+</div></body></html>

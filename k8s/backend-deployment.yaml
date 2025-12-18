@@ -13,8 +13,8 @@ spec:
         app: billing-backend
     spec:
       containers:
-        - name: backend
-          image: billing-backend:latest
-          imagePullPolicy: IfNotPresent
-          ports:
-            - containerPort: 8000
+      - name: backend
+        image: billing-backend:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
