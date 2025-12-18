@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="/static/style.css">
+  <script>
+    function toggle(id){
+      document.getElementById(id).style.display =
+        document.getElementById(id+'-c').checked ? 'block':'none';
+    }
+  </script>
+</head>
+<body>
+<header>
+  <h2>Cloud Billing Aggregator</h2>
+  <a href="/logout">Logout</a>
+</header>
+
+<main>
+  <section class="surface">
+    <h3>Connect Cloud Accounts</h3>
+    <p class="muted">Credentials are stored only for this session.</p>
+
+    <form method="post">
+      <label><input type="checkbox" id="aws-c" name="use_aws" onchange="toggle('aws')"> Amazon Web Services</label>
+      <div id="aws" class="nested">
+        <input name="aws_access_key" placeholder="AWS Access Key">
+        <input name="aws_secret_key" placeholder="AWS Secret Key">
+      </div>
+
+      <hr>
+
+      <label><input type="checkbox" id="azure-c" name="use_azure" onchange="toggle('azure')"> Microsoft Azure</label>
+      <div id="azure" class="nested">
+        <input name="tenant_id" placeholder="Tenant ID">
+        <input name="client_id" placeholder="Client ID">
+        <input name="client_secret" placeholder="Client Secret">
+        <input name="subscription_id" placeholder="Subscription ID">
+      </div>
+
+      <button>Continue to Dashboard</button>
+    </form>
+  </section>
+</main>
+</body>
+</html>

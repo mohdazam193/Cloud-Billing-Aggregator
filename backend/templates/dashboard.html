@@ -1,18 +1,74 @@
-<html><head><link rel="stylesheet" href="/static/style.css"></head>
-<body><div class="container">
-<h1>Cost Dashboard</h1>
-<form method="get">
-<select name="days" onchange="this.form.submit()">
-<option value="30" {% if days==30 %}selected{% endif %}>30d</option>
-<option value="60" {% if days==60 %}selected{% endif %}>60d</option>
-<option value="90" {% if days==90 %}selected{% endif %}>90d</option>
-</select></form>
-<div class="stats">
-<div class="stat-card"><h3>Total</h3><p>${{ total }}</p></div>
-{% if aws_services %}<div class="stat-card"><h3>AWS</h3><p>${{ aws_total }}</p></div>{% endif %}
-{% if azure_services %}<div class="stat-card"><h3>Azure</h3><p>${{ azure_total }}</p></div>{% endif %}
-</div>
-{% if aws_services %}<h2>AWS Services</h2><table>{% for s in aws_services %}<tr><td>{{ s.service }}</td><td>${{ s.cost }}</td></tr>{% endfor %}</table>{% endif %}
-{% if azure_services %}<h2>Azure Services</h2><table>{% for s in azure_services %}<tr><td>{{ s.service }}</td><td>${{ s.cost }}</td></tr>{% endfor %}</table>{% endif %}
-<a href="/logout">Logout</a>
-</div></body></html>
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<header>
+  <h2>Cloud Billing Aggregator</h2>
+  <div>
+    <a href="/export/csv">Export CSV</a> |
+    <a href="/logout">Logout</a>
+  </div>
+</header>
+
+<main>
+  <section class="intro">
+    <h1>Cost Insights</h1>
+    <p>Spend overview</p>
+
+    <form method="get" class="range">
+      <select name="range" onchange="this.form.submit()">
+        <option value="1d">Last 1 day</option>
+        <option value="30d" selected>Last 30 days</option>
+        <option value="60d">Last 60 days</option>
+        <option value="90d">Last 90 days</option>
+      </select>
+    </form>
+  </section>
+
+  <section class="grid">
+    <div class="card">
+      <span>Total Spend</span>
+      <strong>${{ total }}</strong>
+    </div>
+
+    {% if aws_services %}
+    <div class="card">
+      <span>AWS</span>
+      <strong>${{ aws_total }}</strong>
+      <em>{{ aws_change }}% {% if aws_trend=='up' %}↑{% elif aws_trend=='down' %}↓{% endif %}</em>
+    </div>
+    {% endif %}
+
+    {% if azure_services %}
+    <div class="card">
+      <span>Azure</span>
+      <strong>${{ azure_total }}</strong>
+      <em>{{ azure_change }}% {% if azure_trend=='up' %}↑{% elif azure_trend=='down' %}↓{% endif %}</em>
+    </div>
+    {% endif %}
+  </section>
+
+  <section class="surface">
+    <h3>Spend Distribution</h3>
+    <canvas id="chart"></canvas>
+  </section>
+</main>
+
+<script>
+new Chart(document.getElementById('chart'),{
+  type:'bar',
+  data:{
+    labels:['AWS','Azure'],
+    datasets:[{
+      data:[{{ aws_total }}, {{ azure_total }}],
+      backgroundColor:['#2563eb','#9333ea']
+    }]
+  },
+  options:{plugins:{legend:{display:false}}}
+});
+</script>
+</body>
+</html>

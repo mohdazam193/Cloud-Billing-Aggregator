@@ -1,20 +1,20 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: billing-backend
+  name: cloud-billing-aggregator
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: billing-backend
+      app: cloud-billing-aggregator
   template:
     metadata:
       labels:
-        app: billing-backend
+        app: cloud-billing-aggregator
     spec:
       containers:
-      - name: backend
-        image: billing-backend:latest
+      - name: app
+        image: cloud-billing-aggregator:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8000

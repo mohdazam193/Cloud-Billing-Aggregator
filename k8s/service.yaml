@@ -1,10 +1,10 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: billing-backend
+  name: cloud-billing-aggregator
 spec:
   selector:
-    app: billing-backend
+    app: cloud-billing-aggregator
   ports:
   - port: 8000
     targetPort: 8000
