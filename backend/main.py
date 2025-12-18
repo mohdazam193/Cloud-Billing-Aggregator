@@ -1,50 +1,81 @@
 from fastapi import FastAPI, Request, Form
-from fastapi.responses import RedirectResponse, HTMLResponse, StreamingResponse
+from fastapi.responses import RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 from datetime import date, timedelta, datetime
-import boto3, csv, io
+import boto3
+import csv
+import io
 
 from azure.identity import ClientSecretCredential
 from azure.mgmt.costmanagement import CostManagementClient
 
+# -------------------------------------------------
+# App setup
+# -------------------------------------------------
 app = FastAPI()
-app.add_middleware(SessionMiddleware, secret_key="dev-secret")
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
+app.add_middleware(
+    SessionMiddleware,
+    secret_key="dev-secret",
+    same_site="lax"
+)
 
+app.mount("/static", StaticFiles(directory="/app/static"), name="static")
+templates = Jinja2Templates(directory="/app/templates")
+
+# -------------------------------------------------
+# Hardcoded admin (as approved)
+# -------------------------------------------------
 ADMIN_USER = "Napster193"
 ADMIN_PASS = "ChangeMe123"
 
 
-def trend(curr, prev):
+# -------------------------------------------------
+# Helpers
+# -------------------------------------------------
+def trend(curr: float, prev: float):
     if prev == 0:
         return 0, "neutral"
     pct = round(((curr - prev) / prev) * 100, 1)
     return pct, "up" if pct > 0 else "down"
 
 
-@app.get("/", response_class=HTMLResponse)
+# -------------------------------------------------
+# Routes
+# -------------------------------------------------
+@app.get("/")
 def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
+    return templates.TemplateResponse(
+        "login.html",
+        {"request": request}
+    )
 
 
 @app.post("/login")
-def login(request: Request, username: str = Form(...), password: str = Form(...)):
+def login(
+    request: Request,
+    username: str = Form(...),
+    password: str = Form(...)
+):
     if username == ADMIN_USER and password == ADMIN_PASS:
         request.session.clear()
         request.session["user"] = True
         return RedirectResponse("/connect", status_code=302)
+
     return RedirectResponse("/", status_code=302)
 
 
-@app.get("/connect", response_class=HTMLResponse)
+@app.get("/connect")
 def connect_page(request: Request):
     if not request.session.get("user"):
         return RedirectResponse("/", status_code=302)
-    return templates.TemplateResponse("connect.html", {"request": request})
+
+    return templates.TemplateResponse(
+        "connect.html",
+        {"request": request}
+    )
 
 
 @app.post("/connect")
@@ -59,6 +90,7 @@ def save_credentials(
     client_secret: str = Form(None),
     subscription_id: str = Form(None),
 ):
+    # Clear previous cloud sessions
     request.session["aws"] = None
     request.session["azure"] = None
 
@@ -79,7 +111,7 @@ def save_credentials(
     return RedirectResponse("/dashboard", status_code=302)
 
 
-@app.get("/dashboard", response_class=HTMLResponse)
+@app.get("/dashboard")
 def dashboard(
     request: Request,
     range: str = "30d",
@@ -91,6 +123,7 @@ def dashboard(
 
     today = date.today()
 
+    # ---------------- Time ranges ----------------
     if range == "1d":
         start = today - timedelta(days=1)
         end = today
@@ -111,14 +144,15 @@ def dashboard(
     prev_start = start - timedelta(days=period_days)
     prev_end = start
 
-    aws_total = azure_total = 0
-    aws_prev = azure_prev = 0
+    aws_total = azure_total = 0.0
+    aws_prev = azure_prev = 0.0
     aws_services = []
     azure_services = []
 
-    # ---------- AWS ----------
+    # ---------------- AWS ----------------
     if request.session.get("aws"):
         aws = request.session["aws"]
+
         ce = boto3.client(
             "ce",
             aws_access_key_id=aws["access_key"],
@@ -135,7 +169,10 @@ def dashboard(
 
         for g in curr["ResultsByTime"][0]["Groups"]:
             cost = float(g["Metrics"]["UnblendedCost"]["Amount"])
-            aws_services.append({"service": g["Keys"][0], "cost": cost})
+            aws_services.append({
+                "service": g["Keys"][0],
+                "cost": cost
+            })
             aws_total += cost
 
         prev = ce.get_cost_and_usage(
@@ -143,42 +180,61 @@ def dashboard(
             Granularity="MONTHLY",
             Metrics=["UnblendedCost"],
         )
-        aws_prev = float(prev["ResultsByTime"][0]["Total"]["UnblendedCost"]["Amount"])
 
-    # ---------- Azure ----------
+        aws_prev = float(
+            prev["ResultsByTime"][0]["Total"]["UnblendedCost"]["Amount"]
+        )
+
+    # ---------------- Azure ----------------
     if request.session.get("azure"):
         az = request.session["azure"]
+
         cred = ClientSecretCredential(
             tenant_id=az["tenant_id"],
             client_id=az["client_id"],
             client_secret=az["client_secret"],
         )
+
         cm = CostManagementClient(cred)
         scope = f"/subscriptions/{az['subscription_id']}"
 
         query = {
             "type": "ActualCost",
             "timeframe": "Custom",
-            "timePeriod": {"from": start.isoformat(), "to": end.isoformat()},
+            "timePeriod": {
+                "from": start.isoformat(),
+                "to": end.isoformat()
+            },
             "dataset": {
                 "granularity": "None",
-                "aggregation": {"totalCost": {"name": "Cost", "function": "Sum"}},
-                "grouping": [{"type": "Dimension", "name": "ServiceName"}],
+                "aggregation": {
+                    "totalCost": {
+                        "name": "Cost",
+                        "function": "Sum"
+                    }
+                },
+                "grouping": [
+                    {"type": "Dimension", "name": "ServiceName"}
+                ],
             },
         }
 
         res = cm.query.usage(scope, query)
         for r in res.rows:
-            azure_services.append({"service": r[0], "cost": r[1]})
-            azure_total += r[1]
+            azure_services.append({
+                "service": r[0],
+                "cost": float(r[1])
+            })
+            azure_total += float(r[1])
 
-        prev_q = query.copy()
-        prev_q["timePeriod"] = {
+        prev_query = query.copy()
+        prev_query["timePeriod"] = {
             "from": prev_start.isoformat(),
             "to": prev_end.isoformat(),
         }
-        prev_res = cm.query.usage(scope, prev_q)
-        azure_prev = sum(r[1] for r in prev_res.rows)
+
+        prev_res = cm.query.usage(scope, prev_query)
+        azure_prev = sum(float(r[1]) for r in prev_res.rows)
 
     aws_change, aws_trend = trend(aws_total, aws_prev)
     azure_change, azure_trend = trend(azure_total, azure_prev)
