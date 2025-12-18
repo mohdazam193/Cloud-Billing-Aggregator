@@ -26,7 +26,7 @@ app.mount("/static", StaticFiles(directory="/app/static"), name="static")
 templates = Jinja2Templates(directory="/app/templates")
 
 # -------------------------------------------------
-# Hardcoded admin (as approved)
+# Hardcoded admin
 # -------------------------------------------------
 ADMIN_USER = "Napster193"
 ADMIN_PASS = "ChangeMe123"
@@ -90,7 +90,6 @@ def save_credentials(
     client_secret: str = Form(None),
     subscription_id: str = Form(None),
 ):
-    # Clear previous cloud sessions
     request.session["aws"] = None
     request.session["azure"] = None
 
@@ -149,7 +148,7 @@ def dashboard(
     aws_services = []
     azure_services = []
 
-    # ---------------- AWS ----------------
+    # ---------------- AWS (FIXED) ----------------
     if request.session.get("aws"):
         aws = request.session["aws"]
 
@@ -162,27 +161,34 @@ def dashboard(
 
         curr = ce.get_cost_and_usage(
             TimePeriod={"Start": str(start), "End": str(end)},
-            Granularity="MONTHLY",
+            Granularity="DAILY",
             Metrics=["UnblendedCost"],
             GroupBy=[{"Type": "DIMENSION", "Key": "SERVICE"}],
         )
 
-        for g in curr["ResultsByTime"][0]["Groups"]:
-            cost = float(g["Metrics"]["UnblendedCost"]["Amount"])
-            aws_services.append({
-                "service": g["Keys"][0],
-                "cost": cost
-            })
-            aws_total += cost
+        service_totals = {}
+
+        for day in curr["ResultsByTime"]:
+            for g in day.get("Groups", []):
+                service = g["Keys"][0]
+                cost = float(g["Metrics"]["UnblendedCost"]["Amount"])
+                service_totals[service] = service_totals.get(service, 0) + cost
+                aws_total += cost
+
+        aws_services = [
+            {"service": svc, "cost": round(cost, 2)}
+            for svc, cost in service_totals.items()
+        ]
 
         prev = ce.get_cost_and_usage(
             TimePeriod={"Start": str(prev_start), "End": str(prev_end)},
-            Granularity="MONTHLY",
+            Granularity="DAILY",
             Metrics=["UnblendedCost"],
         )
 
-        aws_prev = float(
-            prev["ResultsByTime"][0]["Total"]["UnblendedCost"]["Amount"]
+        aws_prev = sum(
+            float(day["Total"]["UnblendedCost"]["Amount"])
+            for day in prev["ResultsByTime"]
         )
 
     # ---------------- Azure ----------------

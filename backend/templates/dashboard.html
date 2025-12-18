@@ -18,13 +18,13 @@
     <h1>Cost Insights</h1>
     <p>Spend overview</p>
 
-    <form method="get" class="range">
-      <select name="range" onchange="this.form.submit()">
-        <option value="1d">Last 1 day</option>
-        <option value="30d" selected>Last 30 days</option>
-        <option value="60d">Last 60 days</option>
-        <option value="90d">Last 90 days</option>
-      </select>
+    <select name="range" onchange="this.form.submit()">
+  <option value="1d" {{ 'selected' if range == '1d' else '' }}>Last 1 day</option>
+  <option value="30d" {{ 'selected' if range == '30d' else '' }}>Last 30 days</option>
+  <option value="60d" {{ 'selected' if range == '60d' else '' }}>Last 60 days</option>
+  <option value="90d" {{ 'selected' if range == '90d' else '' }}>Last 90 days</option>
+</select>
+
     </form>
   </section>
 
