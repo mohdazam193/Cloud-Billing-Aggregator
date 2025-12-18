@@ -1,3 +1,1 @@
-1. docker build images
-2. kubectl apply -f k8s/
-3. port-forward frontend
+Build Docker image, deploy to Kubernetes, port-forward service.

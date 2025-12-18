@@ -1,1 +1,1 @@
-Browser → React UI → FastAPI → AWS & Azure Billing APIs
+FastAPI serving HTML/CSS, calling AWS and Azure billing APIs.

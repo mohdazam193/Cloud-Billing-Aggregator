@@ -1,48 +1,65 @@
-from fastapi import FastAPI, Request, HTTPException, Query
+from fastapi import FastAPI, Request, Form
+from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
-from starlette.responses import JSONResponse
-from datetime import datetime, timedelta
 import boto3
 from azure.identity import ClientSecretCredential
 from azure.mgmt.costmanagement import CostManagementClient
+from datetime import datetime, timedelta
 
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key="dev-secret")
 
+templates = Jinja2Templates(directory="templates")
+
 DEMO_USER = "Napster193"
 DEMO_PASS = "ChangeMe123"
 
-@app.post("/api/auth/login")
-async def login(request: Request, payload: dict):
-    if payload.get("username") == DEMO_USER and payload.get("password") == DEMO_PASS:
+@app.get("/", response_class=HTMLResponse)
+def login_page(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
+
+@app.post("/login")
+def login(request: Request, username: str = Form(...), password: str = Form(...)):
+    if username == DEMO_USER and password == DEMO_PASS:
         request.session["user"] = True
-        return {"status": "ok"}
-    return JSONResponse(status_code=401, content={"error": "invalid login"})
+        return RedirectResponse("/credentials", status_code=302)
+    return RedirectResponse("/", status_code=302)
 
-@app.post("/api/auth/logout")
-async def logout(request: Request):
-    request.session.clear()
-    return {"status": "logged out"}
+@app.get("/credentials", response_class=HTMLResponse)
+def credentials_page(request: Request):
+    if not request.session.get("user"):
+        return RedirectResponse("/", status_code=302)
+    return templates.TemplateResponse("credentials.html", {"request": request})
 
-@app.post("/api/cloud/login")
-async def cloud_login(request: Request, payload: dict):
-    if "user" not in request.session:
-        raise HTTPException(status_code=401)
-    request.session["aws"] = payload["aws"]
-    request.session["azure"] = payload["azure"]
-    return {"status": "connected"}
+@app.post("/credentials")
+def save_credentials(request: Request,
+    aws_access_key: str = Form(...),
+    aws_secret_key: str = Form(...),
+    tenant_id: str = Form(...),
+    client_id: str = Form(...),
+    client_secret: str = Form(...),
+    subscription_id: str = Form(...)
+):
+    request.session["aws"] = {
+        "access_key": aws_access_key,
+        "secret_key": aws_secret_key
+    }
+    request.session["azure"] = {
+        "tenant_id": tenant_id,
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "subscription_id": subscription_id
+    }
+    return RedirectResponse("/dashboard", status_code=302)
 
-def date_range(days):
-    end = datetime.utcnow().date()
-    start = end - timedelta(days=days)
-    return str(start), str(end)
-
-@app.get("/api/summary")
-def summary(request: Request, days: int = Query(30)):
+@app.get("/dashboard", response_class=HTMLResponse)
+def dashboard(request: Request):
     if "aws" not in request.session or "azure" not in request.session:
-        raise HTTPException(status_code=401)
+        return RedirectResponse("/", status_code=302)
 
-    start, end = date_range(days)
+    end = datetime.utcnow().date()
+    start = end - timedelta(days=30)
 
     aws = request.session["aws"]
     ce = boto3.client("ce",
@@ -50,14 +67,11 @@ def summary(request: Request, days: int = Query(30)):
         aws_secret_access_key=aws["secret_key"],
         region_name="us-east-1"
     )
-
-    aws_resp = ce.get_cost_and_usage(
-        TimePeriod={"Start": start, "End": end},
-        Granularity="DAILY",
+    aws_cost = ce.get_cost_and_usage(
+        TimePeriod={"Start": str(start), "End": str(end)},
+        Granularity="MONTHLY",
         Metrics=["UnblendedCost"]
-    )
-
-    aws_total = sum(float(d["Total"]["UnblendedCost"]["Amount"]) for d in aws_resp["ResultsByTime"])
+    )["ResultsByTime"][0]["Total"]["UnblendedCost"]["Amount"]
 
     az = request.session["azure"]
     cred = ClientSecretCredential(
@@ -67,22 +81,22 @@ def summary(request: Request, days: int = Query(30)):
     )
     cm = CostManagementClient(cred)
     scope = f"/subscriptions/{az['subscription_id']}"
-
-    az_query = {
+    query = {
         "type": "ActualCost",
-        "timeframe": "Custom",
-        "timePeriod": {"from": start, "to": end},
-        "dataset": {
-            "granularity": "Daily",
-            "aggregation": {"totalCost": {"name": "Cost", "function": "Sum"}}
-        }
+        "timeframe": "MonthToDate",
+        "dataset": {"granularity": "None",
+        "aggregation": {"totalCost": {"name": "Cost", "function": "Sum"}}}
     }
+    az_cost = cm.query.usage(scope, query).rows[0][0]
 
-    az_resp = cm.query.usage(scope, az_query)
-    az_total = sum(r[0] for r in az_resp.rows)
+    return templates.TemplateResponse("dashboard.html", {
+        "request": request,
+        "aws": aws_cost,
+        "azure": az_cost,
+        "total": float(aws_cost) + float(az_cost)
+    })
 
-    return {
-        "total": round(aws_total + az_total, 2),
-        "aws": round(aws_total, 2),
-        "azure": round(az_total, 2)
-    }
+@app.get("/logout")
+def logout(request: Request):
+    request.session.clear()
+    return RedirectResponse("/", status_code=302)
